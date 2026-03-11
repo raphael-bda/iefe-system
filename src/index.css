@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Configuração do Tema no Tailwind v4 */
+@theme {
+  --color-iefe-light: #00b359;
+  --color-iefe: #009045;
+  --color-iefe-dark: #006630;
+  
+  --color-diamond: #F8F9FA;
+  
+  --color-dark-900: #0F1115;
+  --color-dark-800: #1A1D24;
+  --color-dark-700: #2A2E39;
+}
+
+/* Estilos base da página */
+@layer base {
+  body {
+    @apply bg-diamond text-gray-900 transition-colors duration-300;
+  }
+  .dark body {
+    @apply bg-dark-900 text-gray-100;
+  }
+}
+
+/* Componentes reaproveitáveis */
+@layer components {
+  .glass-card {
+    @apply bg-white border border-gray-200 shadow-sm rounded-xl transition-all;
+  }
+  .dark .glass-card {
+    @apply bg-dark-800 border-dark-700 shadow-md;
+  }
+}

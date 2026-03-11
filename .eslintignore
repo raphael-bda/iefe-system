@@ -1,0 +1,7 @@
+# Ignore CSS files
+*.css
+
+# Ignore node_modules and dist
+node_modules
+dist
+
