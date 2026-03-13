@@ -1,34 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+/* Importação base do Tailwind v4 */
 @import "tailwindcss";
 
-/* Configuração do Tema no Tailwind v4 */
+/* CORREÇÃO 1: Sintaxe oficial e final do Tailwind v4 para forçar o Dark Mode por classe */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-iefe-light: #00b359;
-  --color-iefe: #009045;
-  --color-iefe-dark: #006630;
-  
-  --color-diamond: #F8F9FA;
-  
-  --color-dark-900: #0F1115;
-  --color-dark-800: #1A1D24;
-  --color-dark-700: #2A2E39;
+  /* Cores da Marca IEFE */
+  --color-iefe: #6366F1;
+  --color-iefe-dark: #4F46E5;
+  --color-iefe-light: #818CF8;
+
+  /* Cores Escuras mais Suaves */
+  --color-dark-bg: #13141C;
+  --color-dark-card: #1C1D29;
+  --color-dark-border: #2A2B3D;
+
+  /* Textos Confortáveis */
+  --color-text-light: #334155;
+  --color-text-dark: #CBD5E1;
+
+  /* Tipografia e Animações */
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  --animate-gradient-x: gradient-x 15s ease infinite;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes gradient-x {
+    0%, 100% { background-size: 200% 200%; background-position: left center; }
+    50% { background-size: 200% 200%; background-position: right center; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
 }
 
-/* Estilos base da página */
 @layer base {
-  body {
-    @apply bg-diamond text-gray-900 transition-colors duration-300;
+  html {
+    scroll-behavior: smooth;
+    /* Avisa o navegador que o tema base é claro */
+    color-scheme: light;
   }
-  .dark body {
-    @apply bg-dark-900 text-gray-100;
+  
+  html.dark {
+    /* Avisa o navegador para usar as barras de rolagem nativas escuras */
+    color-scheme: dark;
+  }
+
+  /* --- INÍCIO: SCROLLBAR GLOBAL PERSONALIZADA --- */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full border-[2px] border-[#F8FAFC];
+  }
+  html.dark ::-webkit-scrollbar-thumb {
+    /* No modo escuro, usa a nossa cor Navy e a borda igual ao fundo */
+    @apply bg-dark-border border-dark-bg;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-iefe/70 dark:bg-iefe/70;
+  }
+  /* --- FIM: SCROLLBAR GLOBAL --- */
+  
+  body {
+    /* Fundo Modo Claro */
+    @apply bg-[#F8FAFC] text-text-light antialiased selection:bg-iefe selection:text-white transition-colors duration-300;
+  }
+
+  html.dark body {
+    /* Fundo Modo Escuro */
+    @apply bg-dark-bg text-text-dark;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-gray-900 dark:text-white font-bold;
   }
 }
 
-/* Componentes reaproveitáveis */
 @layer components {
+  /* Cards */
   .glass-card {
-    @apply bg-white border border-gray-200 shadow-sm rounded-xl transition-all;
+    @apply bg-white/85 dark:bg-dark-card/85 backdrop-blur-xl border border-gray-200/60 dark:border-dark-border shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] rounded-2xl relative overflow-hidden transition-all duration-300;
   }
-  .dark .glass-card {
-    @apply bg-dark-800 border-dark-700 shadow-md;
+
+  .glass-card:hover {
+    @apply shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] border-gray-300/80 dark:border-white/10;
   }
+
+  /* Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-gray-300 dark:bg-dark-border rounded-full; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-iefe/50; }
 }

@@ -7,6 +7,8 @@ import { Financeiro } from './pages/Financeiro';
 import { Pedagogico } from './pages/Pedagogico';
 import { Ferramentas } from './pages/Ferramentas';
 import { Certificados } from './pages/Certificados';
+import { Suporte } from './pages/Suporte';
+import { Configuracoes } from './pages/Configuracoes';
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
           <Route path="pedagogico" element={<Pedagogico />} />
           <Route path="ferramentas" element={<Ferramentas />} />
           <Route path="certificados" element={<Certificados />} />
+          <Route path="suporte" element={<Suporte />} />
+          <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
       </Routes>
     </BrowserRouter>
