@@ -1,34 +1,33 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Award, UploadCloud, FileArchive, Eye, Download, Users, X, FileText } from 'lucide-react';
+import { toast } from 'sonner'; // <-- Importação do Sonner
+import { UF_MAP, NATURALIDADE_MAP, type Aluno } from '../utils/constants';
+import { CertificateTemplate } from '../components/CertificateTemplate';
 
-// Tipagem do Aluno
-type Aluno = {
-  nome: string;
-  cpf: string;
-  naturalidade: string;
-  telefone: string;
-};
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Mapeamentos para transformar a Sigla do Estado na frase correta
-const UF_MAP: Record<string, string> = {
-  "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia", "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás", "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul", "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná", "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina", "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins"
-};
-
-const NATURALIDADE_MAP: Record<string, string> = {
-  "alagoas": "de Alagoas", "goias": "de Goiás", "goiás": "de Goiás", "mato grosso": "de Mato Grosso", "mato grosso do sul": "de Mato Grosso do Sul", "minas gerais": "de Minas Gerais", "pernambuco": "de Pernambuco", "rondonia": "de Rondônia", "rondônia": "de Rondônia", "roraima": "de Roraima", "santa catarina": "de Santa Catarina", "sao paulo": "de São Paulo", "são paulo": "de São Paulo", "sergipe": "de Sergipe", "bahia": "da Bahia", "paraiba": "da Paraíba", "paraíba": "da Paraíba", "acre": "do Acre", "amapa": "do Amapá", "amapá": "do Amapá", "amazonas": "do Amazonas", "ceara": "do Ceará", "ceará": "do Ceará", "espirito santo": "do Espírito Santo", "espírito santo": "do Espírito Santo", "maranhao": "do Maranhão", "maranhão": "do Maranhão", "para": "do Pará", "pará": "do Pará", "parana": "do Paraná", "paraná": "do Paraná", "piaui": "do Piauí", "piauí": "do Piauí", "rio de janeiro": "do Rio de Janeiro", "rio grande do norte": "do Rio Grande do Norte", "rio grande do sul": "do Rio Grande do Sul", "tocantins": "do Tocantins"
+const cleanName = (nome: string) => {
+  return nome
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9 ]/g, '')
+    .replace(/\s+/g, '_');
 };
 
 export function Certificados() {
   const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [tema, setTema] = useState('');
-  const [dataReal, setDataReal] = useState('20 de outubro de 2025');
-  const [horas, setHoras] = useState('2 horas');
-  const [local, setLocal] = useState('São Paulo, 07 de novembro de 2025');
+  
+  const [formData, setFormData] = useState({
+    tema: '',
+    dataReal: '20 de outubro de 2025',
+    horas: '2 horas',
+    local: 'São Paulo, 07 de novembro de 2025'
+  });
   
   const [gerando, setGerando] = useState(false);
   const [statusText, setStatusText] = useState('');
@@ -37,8 +36,7 @@ export function Certificados() {
   const page1Ref = useRef<HTMLDivElement>(null);
   const page2Ref = useRef<HTMLDivElement>(null);
 
-  // --- PROCESSAMENTO DA PLANILHA ---
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -63,69 +61,48 @@ export function Certificados() {
       };
 
       const extracted: Aluno[] = json.map((row) => {
-        const findKey = (term: string): string | undefined => Object.keys(row).find((k) => k.toLowerCase().includes(term.toLowerCase()));
-        const nomeKey = findKey('nome');
-        const cpfKey = findKey('cpf');
-        const naturalidadeKey = findKey('naturalidade');
-        const estadoKey = findKey('estado');
-        const ufKey = findKey('uf');
-        const whatsappKey = findKey('whatsapp');
-        const telefoneKey = findKey('telefone');
-        
-        const getValue = (key: string | undefined): string => {
-          if (!key) return '';
-          const val = row[key];
-          return typeof val === 'string' ? val : '';
-        };
+        const findKey = (term: string) => Object.keys(row).find((k) => k.toLowerCase().includes(term.toLowerCase()));
         
         return {
-          nome: getValue(nomeKey) || 'Nome Desconhecido',
-          cpf: getValue(cpfKey) || '---',
-          naturalidade: parseNaturalidade(getValue(naturalidadeKey) || getValue(estadoKey) || getValue(ufKey)),
-          telefone: getValue(whatsappKey) || getValue(telefoneKey)
+          nome: (row[findKey('nome') || ''] as string) || 'Nome Desconhecido',
+          cpf: (row[findKey('cpf') || ''] as string) || '---',
+          naturalidade: parseNaturalidade((row[findKey('naturalidade') || ''] || row[findKey('estado') || ''] || row[findKey('uf') || '']) as string),
+          telefone: (row[findKey('whatsapp') || ''] || row[findKey('telefone') || '']) as string
         };
       }).filter(a => a.nome !== 'Nome Desconhecido');
 
       setAlunos(extracted);
-      // Reset no input para permitir re-upload do mesmo arquivo
+      toast.success(`${extracted.length} alunos importados com sucesso!`); // Feedback visual ao carregar planilha
       e.target.value = '';
     };
     reader.readAsArrayBuffer(file);
-  };
-
-  // --- GERADOR DE PDF CORE ---
-  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  }, []);
 
   const gerarPdfBlob = async (): Promise<Blob> => {
     if (!page1Ref.current || !page2Ref.current) throw new Error("Refs not found");
-    
     const canvasFrente = await html2canvas(page1Ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const canvasVerso = await html2canvas(page2Ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
 
-    const imgFrente = canvasFrente.toDataURL('image/jpeg', 0.98);
-    const imgVerso = canvasVerso.toDataURL('image/jpeg', 0.98);
-
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    pdf.addImage(imgFrente, 'JPEG', 0, 0, 297, 210);
+    pdf.addImage(canvasFrente.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, 297, 210);
     pdf.addPage('a4', 'landscape');
-    pdf.addImage(imgVerso, 'JPEG', 0, 0, 297, 210);
+    pdf.addImage(canvasVerso.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, 297, 210);
 
     return pdf.output('blob');
   };
 
   const baixarIndividual = async (aluno: Aluno) => {
-    setPreviewModal(aluno); // Define o aluno no template oculto
+    setPreviewModal(aluno);
     setGerando(true);
     setStatusText(`Gerando certificado de ${aluno.nome}...`);
-    
     try {
-      await wait(300); // Aguarda o React renderizar os dados do aluno no template oculto
+      await wait(300);
       const blob = await gerarPdfBlob();
-      const cleanName = aluno.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
-      saveAs(blob, `Certificado_${cleanName}.pdf`);
+      saveAs(blob, `Certificado_${cleanName(aluno.nome)}.pdf`);
+      toast.success(`Certificado gerado: ${aluno.nome}`); // <-- Notificação de sucesso
     } catch (error) {
       console.error(error);
-      alert("Erro ao gerar certificado.");
+      toast.error("Erro ao gerar certificado. Tente novamente."); // <-- Notificação de erro
     } finally {
       setGerando(false);
       setPreviewModal(null);
@@ -142,59 +119,27 @@ export function Certificados() {
       for (let i = 0; i < alunos.length; i++) {
         const aluno = alunos[i];
         setStatusText(`Processando: ${aluno.nome} (${i + 1}/${alunos.length})`);
-        setPreviewModal(aluno); // Injeta os dados na tela oculta
-        
-        await wait(300); // Dá tempo pro DOM atualizar
+        setPreviewModal(aluno);
+        await wait(300);
         const blob = await gerarPdfBlob();
-        const cleanName = aluno.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
-        folder?.file(`${cleanName}.pdf`, blob);
+        folder?.file(`${cleanName(aluno.nome)}.pdf`, blob);
       }
-
       setStatusText("Empacotando arquivo ZIP...");
       const content = await zip.generateAsync({ type: 'blob' });
       saveAs(content, 'Certificados_IEFE_Lote.zip');
+      toast.success("Arquivo ZIP gerado com sucesso!"); // <-- Notificação de sucesso no Lote
     } catch (error) {
       console.error(error);
-      alert("Erro ao gerar lote.");
+      toast.error("Erro ao gerar lote em ZIP. Tente novamente."); // <-- Notificação de erro
     } finally {
       setGerando(false);
       setPreviewModal(null);
     }
   };
 
-  // --- RENDER DO TEMPLATE DO CERTIFICADO ---
-  // Este é o componente exato do PDF que ficará oculto/ou no preview
-  const CertificateTemplate = ({ aluno }: { aluno: Aluno }) => (
-    <div id="pdf-content" className="bg-white w-[1123px]">
-      {/* PÁGINA 1 - FRENTE */}
-      <div ref={page1Ref} className="relative w-[1123px] h-[794px] overflow-hidden bg-white">
-        <img src="/img/fundo_certificado.jpg" className="absolute inset-0 w-full h-full object-fill z-0" crossOrigin="anonymous" alt="Fundo" />
-        <div className="absolute inset-0 z-10 font-serif text-black">
-          
-          <div className="absolute top-[42%] left-[50%] -translate-x-1/2 w-[82%] text-[20px] leading-[1.8] text-justify">
-            <span className="block text-[32px] font-bold uppercase text-center mb-[25px] leading-tight font-sans tracking-wide">
-              {aluno.nome}
-            </span>
-            natural do estado <span className="font-bold">{aluno.naturalidade}</span>, portador(a) do CPF <span className="font-bold">{aluno.cpf}</span> participou da aula sobre o tema "<span className="font-bold">{tema || "TEMA DO CURSO"}</span>", realizado no dia <span className="font-bold">{dataReal}</span>, com carga horária total de <span className="font-bold">{horas}</span>.
-          </div>
-          
-          <div className="absolute top-[70%] right-[13%] w-[40%] text-[18px] text-center">
-            {local}
-          </div>
-          
-          <div className="absolute top-[80%] left-[13%] w-[25%] text-[18px] font-bold uppercase text-center font-sans leading-tight">
-            {aluno.nome}
-          </div>
-        </div>
-      </div>
-
-      {/* PÁGINA 2 - VERSO */}
-      <div ref={page2Ref} className="relative w-[1123px] h-[794px] overflow-hidden bg-white mt-4">
-        <img src="/img/verso_certificado.jpg" className="absolute inset-0 w-full h-full object-fill z-0" crossOrigin="anonymous" alt="Verso" />
-        {/* Se quiser adicionar texto dinâmico no verso, basta criar as divs absolutas aqui, assim como fizemos na frente */}
-      </div>
-    </div>
-  );
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
@@ -209,8 +154,6 @@ export function Certificados() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Lado Esquerdo - Configurações */}
         <div className="lg:col-span-4 space-y-6">
           <label className="block glass-card p-8 rounded-xl border-dashed border-2 hover:border-iefe transition text-center cursor-pointer group">
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
@@ -224,30 +167,28 @@ export function Certificados() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">Curso / Tema</label>
-                <textarea value={tema} onChange={e => setTema(e.target.value)} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-3 outline-none focus:border-iefe h-20 resize-none text-sm" placeholder="Ex: Pós-Graduação em..."></textarea>
+                <textarea name="tema" value={formData.tema} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-3 outline-none focus:border-iefe h-20 resize-none text-sm" placeholder="Ex: Pós-Graduação em..."></textarea>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-gray-500 mb-1 block">Data Realização</label>
-                  <input type="text" value={dataReal} onChange={e => setDataReal(e.target.value)} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
+                  <input type="text" name="dataReal" value={formData.dataReal} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 mb-1 block">Horas</label>
-                  <input type="text" value={horas} onChange={e => setHoras(e.target.value)} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
+                  <input type="text" name="horas" value={formData.horas} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">Cidade/Emissão</label>
-                <input type="text" value={local} onChange={e => setLocal(e.target.value)} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
+                <input type="text" name="local" value={formData.local} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Lado Direito - Tabela e Ações */}
         <div className="lg:col-span-8">
           <div className="glass-card rounded-xl flex flex-col min-h-[500px] border border-gray-200 dark:border-dark-700 relative overflow-hidden">
-            
             <div className="p-4 border-b border-gray-200 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 flex justify-between items-center z-10">
               <h3 className="font-bold flex items-center gap-2"><Users className="text-gray-400" size={18}/> Lista de Emissão <span className="bg-gray-200 dark:bg-dark-800 text-xs px-2 py-0.5 rounded ml-2">{alunos.length}</span></h3>
               {alunos.length > 0 && (
@@ -290,7 +231,6 @@ export function Certificados() {
               )}
             </div>
 
-            {/* Loader Overlay (Bloqueia a tela durante a geração) */}
             {gerando && (
               <div className="absolute inset-0 bg-white/90 dark:bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center z-50">
                 <div className="w-12 h-12 border-4 border-iefe border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -302,30 +242,41 @@ export function Certificados() {
         </div>
       </div>
 
-      {/* --- RENDER OCULTO PARA O HTML2CANVAS --- */}
-      {/* Nós só renderizamos o template invisível se houver um modal de preview ativo ou uma geração em andamento */}
       <div className="fixed top-[-10000px] left-[-10000px] opacity-1 pointer-events-none">
         {(previewModal || alunos[0]) && (
-          <CertificateTemplate aluno={previewModal || alunos[0]} />
+          <CertificateTemplate 
+            aluno={previewModal || alunos[0]} 
+            tema={formData.tema}
+            dataReal={formData.dataReal}
+            horas={formData.horas}
+            local={formData.local}
+            page1Ref={page1Ref}
+            page2Ref={page2Ref}
+          />
         )}
       </div>
 
-      {/* --- MODAL DE PREVISUALIZAÇÃO VISUAL --- */}
       {previewModal && !gerando && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center p-4">
           <div className="w-full max-w-5xl flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Pré-visualização: {previewModal.nome}</h3>
             <button onClick={() => setPreviewModal(null)} className="text-gray-400 hover:text-white bg-dark-800 p-2 rounded-full"><X size={24}/></button>
           </div>
-          {/* Usamos scale do CSS para caber na tela do usuário, mas ele reflete o HTML gigante em tempo real */}
           <div className="overflow-auto max-h-[85vh] custom-scrollbar w-full flex justify-center pb-12">
             <div className="transform scale-[0.4] sm:scale-[0.5] lg:scale-[0.7] xl:scale-[0.8] origin-top shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-               <CertificateTemplate aluno={previewModal} />
+               <CertificateTemplate 
+                  aluno={previewModal}
+                  tema={formData.tema}
+                  dataReal={formData.dataReal}
+                  horas={formData.horas}
+                  local={formData.local}
+                  page1Ref={page1Ref}
+                  page2Ref={page2Ref} 
+               />
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -1,7 +1,9 @@
-# Task: Fix Tailwind CSS PostCSS Error
+# TODO: Fix Module Import Errors
 
 ## Plan Steps:
-- [x] 1. Delete postcss.config.js (conflicting legacy config) - EXECUTED SUCCESSFULLY via rm
-- [x] 2. Test: Run `npm run dev` and verify error is gone (restart dev server if running) - CONFIRMED FIXED BY USER
-- [x] 3. Confirm Tailwind styles load correctly in browser
-- [x] 4. Complete task
+- [x] 1. Create src/utils/constants.ts with Aluno, UF_MAP, NATURALIDADE_MAP
+- [x] 2. Fix imports in src/pages/Certificados.tsx
+- [x] 3. Fix imports in src/pages/CertificateTemplate.tsx
+- [ ] 4. Test and verify no errors (restart TS server / npm run dev)
+- [x] Fixed RefObject null types in CertificateTemplate.tsx
+- [ ] 5. Complete task

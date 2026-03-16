@@ -1,30 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { Target, Users, Wallet, GraduationCap, Clock } from 'lucide-react';
 
-export function Dashboard() {
-  const { leads, protocolos, alunos } = useStore();
+function useClock() {
   const [time, setTime] = useState(new Date());
-  
-  const greeting = (() => {
-    const hour = time.getHours();
-    if (hour < 12) return "Bom dia. Vamos construir.";
-    if (hour < 18) return "Boa tarde. Mantenha o foco.";
-    return "Boa noite. O mundo é seu.";
-  })();
 
-  // Atualiza o relógio a cada segundo
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const kpis = [
+  const greeting = useMemo(() => {
+    const hour = time.getHours();
+    if (hour < 12) return "Bom dia. Vamos construir.";
+    if (hour < 18) return "Boa tarde. Mantenha o foco.";
+    return "Boa noite. O mundo é seu.";
+  }, [time]);
+
+  return { time, greeting };
+}
+
+export function Dashboard() {
+  // Selectores granulares: Evita que o Dashboard sofra re-renders desnecessários 
+  // caso o utilizador adicione um "script" ou troque de "tema" noutra parte do sistema.
+  const leads = useStore((state) => state.leads);
+  const protocolos = useStore((state) => state.protocolos);
+  const alunos = useStore((state) => state.alunos);
+  
+  const { time, greeting } = useClock();
+
+  const kpis = useMemo(() => [
     { title: 'Leads Ativos', value: leads.length, icon: Target, color: 'text-iefe' },
     { title: 'Protocolos', value: protocolos.length, icon: Users, color: 'text-blue-500' },
     { title: 'Alunos Ativos', value: alunos.filter(a => a.status !== 'formado').length, icon: Wallet, color: 'text-orange-500' },
     { title: 'Total Formados', value: alunos.filter(a => a.status === 'formado').length, icon: GraduationCap, color: 'text-purple-500' },
-  ];
+  ], [leads, protocolos, alunos]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -34,7 +44,6 @@ export function Dashboard() {
           <p className="text-gray-500 text-sm mt-1">{greeting} Bem-vindo ao sistema de gestão educacional IEFE.</p>
         </div>
         
-        {/* Relógio Dinâmico */}
         <div className="glass-card px-6 py-3 flex items-center gap-3 w-fit border-l-4 border-l-iefe">
           <Clock className="text-iefe" size={24} />
           <span className="text-2xl font-mono font-bold tracking-widest text-gray-800 dark:text-white">
