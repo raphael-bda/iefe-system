@@ -5,30 +5,49 @@ import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Award, UploadCloud, FileArchive, Eye, Download, Users, X, FileText } from 'lucide-react';
-import { toast } from 'sonner'; // <-- Importação do Sonner
+import { toast } from 'sonner';
 import { UF_MAP, NATURALIDADE_MAP, type Aluno } from '../utils/constants';
 import { CertificateTemplate } from '../components/CertificateTemplate';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const cleanName = (nome: string) => nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
 
-const cleanName = (nome: string) => {
-  return nome
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9 ]/g, '')
-    .replace(/\s+/g, '_');
+const processExcelData = (json: Record<string, unknown>[]): Aluno[] => {
+  const parseNaturalidade = (val: string) => {
+    if (!val) return "do Brasil";
+    let estado = val.trim();
+    if (val.includes("/") || val.includes("-")) estado = val.split(/[/ -]/).pop()?.trim() || estado;
+    const ufUpper = estado.toUpperCase();
+    if (UF_MAP[ufUpper]) estado = UF_MAP[ufUpper];
+    const chave = estado.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return NATURALIDADE_MAP[chave] || `de ${estado}`;
+  };
+
+  return json.map((row) => {
+    const findKey = (term: string) => Object.keys(row).find((k) => k.toLowerCase().includes(term.toLowerCase()));
+    return {
+      nome: (row[findKey('nome') || ''] as string) || 'Nome Desconhecido',
+      cpf: (row[findKey('cpf') || ''] as string) || '---',
+      naturalidade: parseNaturalidade((row[findKey('naturalidade') || ''] || row[findKey('estado') || ''] || row[findKey('uf') || '']) as string),
+      telefone: (row[findKey('whatsapp') || ''] || row[findKey('telefone') || '']) as string
+    };
+  }).filter(a => a.nome !== 'Nome Desconhecido');
 };
+
+const SkeletonLoader = ({ status }: { status: string }) => (
+  <div className="absolute inset-0 bg-white/80 dark:bg-black/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-in fade-in">
+    <div className="w-full max-w-sm space-y-4">
+      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4 animate-pulse mx-auto" />
+      <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-full animate-pulse" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2 animate-pulse mx-auto" />
+    </div>
+    <p className="mt-6 font-mono text-sm font-bold text-gray-500 animate-pulse">{status}</p>
+  </div>
+);
 
 export function Certificados() {
   const [alunos, setAlunos] = useState<Aluno[]>([]);
-  
-  const [formData, setFormData] = useState({
-    tema: '',
-    dataReal: '20 de outubro de 2025',
-    horas: '2 horas',
-    local: 'São Paulo, 07 de novembro de 2025'
-  });
-  
+  const [formData, setFormData] = useState({ tema: '', dataReal: '20 de outubro de 2025', horas: '2 horas', local: 'São Paulo, 07 de novembro de 2025' });
   const [gerando, setGerando] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [previewModal, setPreviewModal] = useState<Aluno | null>(null);
@@ -42,38 +61,18 @@ export function Certificados() {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const data = new Uint8Array(event.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet);
-
-      const parseNaturalidade = (val: string) => {
-        if (!val) return "do Brasil";
-        let estado = val.trim();
-        if (val.includes("/") || val.includes("-")) {
-          const partes = val.split(/[/ -]/);
-          estado = partes[partes.length - 1].trim();
-        }
-        const ufUpper = estado.toUpperCase();
-        if (UF_MAP[ufUpper]) estado = UF_MAP[ufUpper];
-        const chave = estado.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        return NATURALIDADE_MAP[chave] || `de ${estado}`;
-      };
-
-      const extracted: Aluno[] = json.map((row) => {
-        const findKey = (term: string) => Object.keys(row).find((k) => k.toLowerCase().includes(term.toLowerCase()));
-        
-        return {
-          nome: (row[findKey('nome') || ''] as string) || 'Nome Desconhecido',
-          cpf: (row[findKey('cpf') || ''] as string) || '---',
-          naturalidade: parseNaturalidade((row[findKey('naturalidade') || ''] || row[findKey('estado') || ''] || row[findKey('uf') || '']) as string),
-          telefone: (row[findKey('whatsapp') || ''] || row[findKey('telefone') || '']) as string
-        };
-      }).filter(a => a.nome !== 'Nome Desconhecido');
-
-      setAlunos(extracted);
-      toast.success(`${extracted.length} alunos importados com sucesso!`); // Feedback visual ao carregar planilha
-      e.target.value = '';
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[workbook.SheetNames[0]]);
+        const extracted = processExcelData(json);
+        setAlunos(extracted);
+        toast.success(`${extracted.length} alunos importados com sucesso!`);
+      } catch {
+        toast.error("Erro ao ler planilha. Verifique o arquivo.");
+      } finally {
+        e.target.value = '';
+      }
     };
     reader.readAsArrayBuffer(file);
   }, []);
@@ -82,27 +81,24 @@ export function Certificados() {
     if (!page1Ref.current || !page2Ref.current) throw new Error("Refs not found");
     const canvasFrente = await html2canvas(page1Ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const canvasVerso = await html2canvas(page2Ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
-
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     pdf.addImage(canvasFrente.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, 297, 210);
     pdf.addPage('a4', 'landscape');
     pdf.addImage(canvasVerso.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, 297, 210);
-
     return pdf.output('blob');
   };
 
   const baixarIndividual = async (aluno: Aluno) => {
     setPreviewModal(aluno);
     setGerando(true);
-    setStatusText(`Gerando certificado de ${aluno.nome}...`);
+    setStatusText(`Renderizando: ${aluno.nome}...`);
     try {
       await wait(300);
       const blob = await gerarPdfBlob();
       saveAs(blob, `Certificado_${cleanName(aluno.nome)}.pdf`);
-      toast.success(`Certificado gerado: ${aluno.nome}`); // <-- Notificação de sucesso
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao gerar certificado. Tente novamente."); // <-- Notificação de erro
+      toast.success(`Certificado gerado com sucesso.`);
+    } catch {
+      toast.error("Erro ao gerar certificado.");
     } finally {
       setGerando(false);
       setPreviewModal(null);
@@ -118,7 +114,7 @@ export function Certificados() {
     try {
       for (let i = 0; i < alunos.length; i++) {
         const aluno = alunos[i];
-        setStatusText(`Processando: ${aluno.nome} (${i + 1}/${alunos.length})`);
+        setStatusText(`Processando lote: ${i + 1} de ${alunos.length} (${aluno.nome})`);
         setPreviewModal(aluno);
         await wait(300);
         const blob = await gerarPdfBlob();
@@ -127,102 +123,102 @@ export function Certificados() {
       setStatusText("Empacotando arquivo ZIP...");
       const content = await zip.generateAsync({ type: 'blob' });
       saveAs(content, 'Certificados_IEFE_Lote.zip');
-      toast.success("Arquivo ZIP gerado com sucesso!"); // <-- Notificação de sucesso no Lote
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao gerar lote em ZIP. Tente novamente."); // <-- Notificação de erro
+      toast.success("Arquivo ZIP baixado com sucesso!");
+    } catch {
+      toast.error("Erro ao gerar lote.");
     } finally {
       setGerando(false);
       setPreviewModal(null);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 dark:border-dark-700 pb-6">
         <div>
-          <h1 className="text-3xl md:text-4xl font-black flex items-center gap-3">
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight flex items-center gap-3">
             <Award className="text-iefe" size={36} />
-            Emissão Oficial <span className="text-gray-400 font-normal">/ Certificados</span>
+            Emissão Oficial <span className="text-gray-400 font-medium">/ Certificados</span>
           </h1>
-          <p className="text-gray-500 text-sm mt-2">Importe uma planilha e gere os PDFs em lote rapidamente.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-4 space-y-6">
-          <label className="block glass-card p-8 rounded-xl border-dashed border-2 hover:border-iefe transition text-center cursor-pointer group">
+          <label className="block glass-card p-8 rounded-xl border-dashed border-2 border-gray-300 dark:border-gray-700 hover:border-iefe hover:shadow-[0_0_30px_rgba(var(--color-iefe),0.1)] transition-all text-center cursor-pointer group">
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
-            <UploadCloud className="mx-auto text-gray-400 group-hover:text-iefe transition mb-3" size={48} />
+            <UploadCloud className="mx-auto text-gray-400 group-hover:text-iefe transition-colors mb-3" size={48} />
             <p className="font-bold text-lg mb-1">Carregar Alunos</p>
             <p className="text-xs text-gray-500">Planilha Excel ou CSV</p>
           </label>
 
           <div className="glass-card p-6 rounded-xl border-t-4 border-t-iefe">
-            <h3 className="font-bold mb-4 uppercase text-sm tracking-wider text-gray-500">Dados Variáveis</h3>
+            <h3 className="font-bold mb-4 uppercase text-xs tracking-wider text-gray-500">Dados Variáveis</h3>
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 mb-1 block">Curso / Tema</label>
-                <textarea name="tema" value={formData.tema} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-3 outline-none focus:border-iefe h-20 resize-none text-sm" placeholder="Ex: Pós-Graduação em..."></textarea>
+                <textarea name="tema" value={formData.tema} onChange={(e) => setFormData(p => ({...p, tema: e.target.value}))} className="w-full bg-white/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg p-3 outline-none focus:ring-2 focus:ring-iefe/50 h-20 resize-none text-sm transition-all" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">Data Realização</label>
-                  <input type="text" name="dataReal" value={formData.dataReal} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">Data</label>
+                  <input type="text" name="dataReal" value={formData.dataReal} onChange={(e) => setFormData(p => ({...p, dataReal: e.target.value}))} className="w-full bg-white/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg p-2 outline-none focus:ring-2 focus:ring-iefe/50 text-sm transition-all" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 mb-1 block">Horas</label>
-                  <input type="text" name="horas" value={formData.horas} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
+                  <input type="text" name="horas" value={formData.horas} onChange={(e) => setFormData(p => ({...p, horas: e.target.value}))} className="w-full bg-white/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg p-2 outline-none focus:ring-2 focus:ring-iefe/50 text-sm transition-all" />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 mb-1 block">Cidade/Emissão</label>
-                <input type="text" name="local" value={formData.local} onChange={handleInputChange} className="w-full bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded p-2 outline-none focus:border-iefe text-sm" />
+                <label className="text-xs font-bold text-gray-500 mb-1 block">Local</label>
+                <input type="text" name="local" value={formData.local} onChange={(e) => setFormData(p => ({...p, local: e.target.value}))} className="w-full bg-white/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg p-2 outline-none focus:ring-2 focus:ring-iefe/50 text-sm transition-all" />
               </div>
             </div>
           </div>
         </div>
 
         <div className="lg:col-span-8">
-          <div className="glass-card rounded-xl flex flex-col min-h-[500px] border border-gray-200 dark:border-dark-700 relative overflow-hidden">
-            <div className="p-4 border-b border-gray-200 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 flex justify-between items-center z-10">
-              <h3 className="font-bold flex items-center gap-2"><Users className="text-gray-400" size={18}/> Lista de Emissão <span className="bg-gray-200 dark:bg-dark-800 text-xs px-2 py-0.5 rounded ml-2">{alunos.length}</span></h3>
+          <div className="glass-card rounded-xl flex flex-col min-h-[500px] relative overflow-hidden">
+            <div className="p-4 border-b border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 flex justify-between items-center z-10">
+              <h3 className="font-bold flex items-center gap-2">
+                <Users className="text-gray-400" size={18}/> 
+                Lista de Emissão 
+                {alunos.length > 0 && <span className="bg-iefe/10 text-iefe text-xs px-2.5 py-0.5 rounded-full ml-2 font-bold">{alunos.length}</span>}
+              </h3>
               {alunos.length > 0 && (
-                <button onClick={baixarLoteZIP} disabled={gerando} className="bg-iefe hover:bg-iefe-dark text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition disabled:opacity-50">
-                  <FileArchive size={14} /> {gerando ? 'Gerando...' : 'Gerar ZIP em Lote'}
+                <button onClick={baixarLoteZIP} disabled={gerando} className="bg-iefe hover:bg-iefe-dark text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-iefe/30 active:scale-95">
+                  <FileArchive size={14} /> Gerar Lote (ZIP)
                 </button>
               )}
             </div>
 
-            <div className="flex-grow overflow-x-auto relative">
+            <div className="flex-grow overflow-x-auto relative custom-scrollbar">
               {alunos.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                  <FileText size={48} className="mb-3 opacity-30" />
-                  <p>Nenhuma planilha importada.</p>
+                  <div className="w-16 h-16 mb-4 rounded-2xl bg-gray-100 dark:bg-white/5 flex items-center justify-center border border-gray-200 dark:border-white/5">
+                    <FileText size={32} className="opacity-50" />
+                  </div>
+                  <p className="font-medium text-gray-600 dark:text-gray-400">Nenhum aluno carregado</p>
                 </div>
               ) : (
                 <table className="w-full text-sm text-left whitespace-nowrap">
-                  <thead className="text-xs text-gray-500 uppercase bg-gray-100 dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700">
+                  <thead className="text-xs text-gray-500 uppercase bg-gray-100/50 dark:bg-white/5 border-b border-gray-200/50 dark:border-white/5">
                     <tr>
-                      <th className="px-6 py-4">Nome do Aluno</th>
-                      <th className="px-6 py-4">Estado (Formatado)</th>
+                      <th className="px-6 py-4">Aluno</th>
+                      <th className="px-6 py-4">Estado</th>
                       <th className="px-6 py-4">CPF</th>
                       <th className="px-6 py-4 text-right">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
+                  <tbody className="divide-y divide-gray-200/50 dark:divide-white/5">
                     {alunos.map((aluno, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-dark-800 transition">
-                        <td className="px-6 py-3 font-bold">{aluno.nome}</td>
-                        <td className="px-6 py-3 text-gray-500">{aluno.naturalidade}</td>
-                        <td className="px-6 py-3 font-mono text-gray-500">{aluno.cpf}</td>
-                        <td className="px-6 py-3 text-right flex justify-end gap-2">
-                          <button onClick={() => setPreviewModal(aluno)} className="p-2 bg-gray-200 dark:bg-dark-900 hover:text-iefe rounded transition"><Eye size={14}/></button>
-                          <button onClick={() => baixarIndividual(aluno)} className="p-2 bg-gray-200 dark:bg-dark-900 hover:text-blue-500 rounded transition"><Download size={14}/></button>
+                      <tr key={idx} className="hover:bg-gray-50/80 dark:hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4 font-bold">{aluno.nome}</td>
+                        <td className="px-6 py-4 text-gray-500">{aluno.naturalidade}</td>
+                        <td className="px-6 py-4 font-mono text-gray-500 text-xs">{aluno.cpf}</td>
+                        <td className="px-6 py-4 text-right flex justify-end gap-2">
+                          <button onClick={() => setPreviewModal(aluno)} className="p-2 bg-gray-100 dark:bg-white/5 hover:text-iefe hover:bg-iefe/10 rounded-lg transition-all"><Eye size={16}/></button>
+                          <button onClick={() => baixarIndividual(aluno)} className="p-2 bg-gray-100 dark:bg-white/5 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"><Download size={16}/></button>
                         </td>
                       </tr>
                     ))}
@@ -231,48 +227,26 @@ export function Certificados() {
               )}
             </div>
 
-            {gerando && (
-              <div className="absolute inset-0 bg-white/90 dark:bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-                <div className="w-12 h-12 border-4 border-iefe border-t-transparent rounded-full animate-spin mb-4"></div>
-                <h3 className="font-bold text-lg">Processando Documentos...</h3>
-                <p className="text-sm text-gray-500 font-mono mt-1">{statusText}</p>
-              </div>
-            )}
+            {gerando && <SkeletonLoader status={statusText} />}
           </div>
         </div>
       </div>
 
       <div className="fixed top-[-10000px] left-[-10000px] opacity-1 pointer-events-none">
         {(previewModal || alunos[0]) && (
-          <CertificateTemplate 
-            aluno={previewModal || alunos[0]} 
-            tema={formData.tema}
-            dataReal={formData.dataReal}
-            horas={formData.horas}
-            local={formData.local}
-            page1Ref={page1Ref}
-            page2Ref={page2Ref}
-          />
+          <CertificateTemplate aluno={previewModal || alunos[0]} tema={formData.tema} dataReal={formData.dataReal} horas={formData.horas} local={formData.local} page1Ref={page1Ref} page2Ref={page2Ref} />
         )}
       </div>
 
       {previewModal && !gerando && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-5xl flex justify-between items-center mb-4">
-            <h3 className="text-white font-bold text-lg">Pré-visualização: {previewModal.nome}</h3>
-            <button onClick={() => setPreviewModal(null)} className="text-gray-400 hover:text-white bg-dark-800 p-2 rounded-full"><X size={24}/></button>
+        <div className="fixed inset-0 bg-gray-900/80 dark:bg-black/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+          <div className="w-full max-w-5xl flex justify-between items-center mb-6">
+            <h3 className="text-white font-bold text-xl tracking-tight">Preview: {previewModal.nome}</h3>
+            <button onClick={() => setPreviewModal(null)} className="text-gray-400 hover:text-white bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-all backdrop-blur-sm"><X size={20}/></button>
           </div>
           <div className="overflow-auto max-h-[85vh] custom-scrollbar w-full flex justify-center pb-12">
-            <div className="transform scale-[0.4] sm:scale-[0.5] lg:scale-[0.7] xl:scale-[0.8] origin-top shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-               <CertificateTemplate 
-                  aluno={previewModal}
-                  tema={formData.tema}
-                  dataReal={formData.dataReal}
-                  horas={formData.horas}
-                  local={formData.local}
-                  page1Ref={page1Ref}
-                  page2Ref={page2Ref} 
-               />
+            <div className="transform scale-[0.4] sm:scale-[0.5] lg:scale-[0.7] xl:scale-[0.8] origin-top shadow-[0_20px_60px_rgba(0,0,0,0.6)] rounded-lg overflow-hidden transition-transform">
+               <CertificateTemplate aluno={previewModal} tema={formData.tema} dataReal={formData.dataReal} horas={formData.horas} local={formData.local} page1Ref={page1Ref} page2Ref={page2Ref} />
             </div>
           </div>
         </div>

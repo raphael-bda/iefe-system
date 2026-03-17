@@ -1,102 +1,44 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-/* Importação base do Tailwind v4 */
-@import "tailwindcss";
-
-/* CORREÇÃO 1: Sintaxe oficial e final do Tailwind v4 para forçar o Dark Mode por classe */
-@variant dark (&:where(.dark, .dark *));
-
-@theme {
-  /* Cores da Marca IEFE */
-  --color-iefe: #6366F1;
-  --color-iefe-dark: #4F46E5;
-  --color-iefe-light: #818CF8;
-
-  /* Cores Escuras mais Suaves */
-  --color-dark-bg: #13141C;
-  --color-dark-card: #1C1D29;
-  --color-dark-border: #2A2B3D;
-
-  /* Textos Confortáveis */
-  --color-text-light: #334155;
-  --color-text-dark: #CBD5E1;
-
-  /* Tipografia e Animações */
-  --font-sans: 'Outfit', system-ui, sans-serif;
-  --animate-gradient-x: gradient-x 15s ease infinite;
-  --animate-float: float 6s ease-in-out infinite;
-
-  @keyframes gradient-x {
-    0%, 100% { background-size: 200% 200%; background-position: left center; }
-    50% { background-size: 200% 200%; background-position: right center; }
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-  }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   html {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     scroll-behavior: smooth;
-    /* Avisa o navegador que o tema base é claro */
-    color-scheme: light;
-  }
-  
-  html.dark {
-    /* Avisa o navegador para usar as barras de rolagem nativas escuras */
-    color-scheme: dark;
   }
 
-  /* --- INÍCIO: SCROLLBAR GLOBAL PERSONALIZADA --- */
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased selection:bg-iefe/30 selection:text-iefe-dark dark:bg-[#0B0C10] dark:text-gray-100;
+  }
+
+  /* Custom Scrollbar Premium */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full border-[2px] border-[#F8FAFC];
-  }
-  html.dark ::-webkit-scrollbar-thumb {
-    /* No modo escuro, usa a nossa cor Navy e a borda igual ao fundo */
-    @apply bg-dark-border border-dark-bg;
+    @apply bg-gray-300/50 dark:bg-gray-700/50 rounded-full transition-colors;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-iefe/70 dark:bg-iefe/70;
-  }
-  /* --- FIM: SCROLLBAR GLOBAL --- */
-  
-  body {
-    /* Fundo Modo Claro */
-    @apply bg-[#F8FAFC] text-text-light antialiased selection:bg-iefe selection:text-white transition-colors duration-300;
-  }
-
-  html.dark body {
-    /* Fundo Modo Escuro */
-    @apply bg-dark-bg text-text-dark;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply text-gray-900 dark:text-white font-bold;
+    @apply bg-gray-400/80 dark:bg-gray-600/80;
   }
 }
 
 @layer components {
-  /* Cards */
+  /* Glassmorphism Refinado */
   .glass-card {
-    @apply bg-white/85 dark:bg-dark-card/85 backdrop-blur-xl border border-gray-200/60 dark:border-dark-border shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] rounded-2xl relative overflow-hidden transition-all duration-300;
+    @apply bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl border border-white/80 dark:border-white/10 shadow-sm dark:shadow-2xl rounded-2xl;
+    /* Reflexo sutil no topo para realismo */
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
   }
-
-  .glass-card:hover {
-    @apply shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] border-gray-300/80 dark:border-white/10;
+  
+  .dark .glass-card {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
-
-  /* Scrollbar */
-  .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-  .custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-gray-300 dark:bg-dark-border rounded-full; }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-iefe/50; }
 }

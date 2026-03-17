@@ -21,8 +21,6 @@ function useClock() {
 }
 
 export function Dashboard() {
-  // Selectores granulares: Evita que o Dashboard sofra re-renders desnecessários 
-  // caso o utilizador adicione um "script" ou troque de "tema" noutra parte do sistema.
   const leads = useStore((state) => state.leads);
   const protocolos = useStore((state) => state.protocolos);
   const alunos = useStore((state) => state.alunos);
@@ -30,18 +28,18 @@ export function Dashboard() {
   const { time, greeting } = useClock();
 
   const kpis = useMemo(() => [
-    { title: 'Leads Ativos', value: leads.length, icon: Target, color: 'text-iefe' },
-    { title: 'Protocolos', value: protocolos.length, icon: Users, color: 'text-blue-500' },
-    { title: 'Alunos Ativos', value: alunos.filter(a => a.status !== 'formado').length, icon: Wallet, color: 'text-orange-500' },
-    { title: 'Total Formados', value: alunos.filter(a => a.status === 'formado').length, icon: GraduationCap, color: 'text-purple-500' },
+    { title: 'Leads Ativos', value: leads.length, icon: Target, color: 'text-blue-500', shadow: 'hover:shadow-blue-500/20 hover:border-blue-500/50' },
+    { title: 'Protocolos', value: protocolos.length, icon: Users, color: 'text-indigo-500', shadow: 'hover:shadow-indigo-500/20 hover:border-indigo-500/50' },
+    { title: 'Alunos Ativos', value: alunos.filter(a => a.status !== 'formado').length, icon: Wallet, color: 'text-orange-500', shadow: 'hover:shadow-orange-500/20 hover:border-orange-500/50' },
+    { title: 'Total Formados', value: alunos.filter(a => a.status === 'formado').length, icon: GraduationCap, color: 'text-emerald-500', shadow: 'hover:shadow-emerald-500/20 hover:border-emerald-500/50' },
   ], [leads, protocolos, alunos]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black">Visão Geral <span className="text-gray-400">/ Dashboard</span></h1>
-          <p className="text-gray-500 text-sm mt-1">{greeting} Bem-vindo ao sistema de gestão educacional IEFE.</p>
+          <h1 className="text-3xl font-black tracking-tight">Visão Geral <span className="text-gray-400 font-medium">/ Dashboard</span></h1>
+          <p className="text-gray-500 text-sm mt-1">{greeting} Bem-vindo ao IEFE.</p>
         </div>
         
         <div className="glass-card px-6 py-3 flex items-center gap-3 w-fit border-l-4 border-l-iefe">
@@ -56,10 +54,10 @@ export function Dashboard() {
         {kpis.map((kpi, index) => {
           const Icon = kpi.icon;
           return (
-            <div key={index} className="glass-card p-6 relative overflow-hidden group hover:border-iefe transition-colors">
-              <Icon size={48} className={`absolute right-4 top-4 opacity-10 group-hover:opacity-20 transition-transform group-hover:scale-110 ${kpi.color}`} />
-              <p className="text-xs uppercase font-bold text-gray-500 tracking-wider mb-2">{kpi.title}</p>
-              <h3 className="text-4xl font-black">{kpi.value}</h3>
+            <div key={index} className={`glass-card p-6 relative overflow-hidden group transition-all duration-300 hover:-translate-y-1 ${kpi.shadow}`}>
+              <Icon size={48} className={`absolute right-4 top-4 opacity-10 group-hover:opacity-100 transition-all duration-500 group-hover:scale-110 blur-sm group-hover:blur-none ${kpi.color}`} />
+              <p className="text-xs uppercase font-bold text-gray-500 tracking-wider mb-2 relative z-10">{kpi.title}</p>
+              <h3 className="text-4xl font-black relative z-10">{kpi.value}</h3>
             </div>
           );
         })}

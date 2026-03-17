@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'sonner'; // <-- Importação do Sonner
+import { Toaster } from 'sonner';
 import { Layout } from './components/Layout';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -14,17 +14,15 @@ const Suporte = lazy(() => import('./pages/Suporte').then(m => ({ default: m.Sup
 const Configuracoes = lazy(() => import('./pages/Configuracoes').then(m => ({ default: m.Configuracoes })));
 
 const PageLoader = () => (
-  <div className="flex h-full w-full items-center justify-center p-8">
-    <div className="w-8 h-8 border-4 border-iefe border-t-transparent rounded-full animate-spin"></div>
+  <div className="flex h-full w-full items-center justify-center p-8 min-h-screen">
+    <div className="w-8 h-8 border-4 border-iefe border-t-transparent rounded-full animate-spin" />
   </div>
 );
 
 function App() {
   return (
     <BrowserRouter>
-      {/* Configuração global das notificações (richColors deixa os alertas com cores semânticas como verde/vermelho) */}
-      <Toaster position="top-right" richColors />
-      
+      <Toaster position="top-right" richColors closeButton />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Layout />}>

@@ -1,4 +1,3 @@
-// src/store/useStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -31,59 +30,33 @@ interface AppState {
   deleteScript: (id: string) => void;
 }
 
-// Função auxiliar (Helper) para não repetirmos código
 const getTodayDate = () => new Date().toLocaleDateString('pt-BR');
+const generateShortId = (prefix: string) => `${prefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
       theme: 'light',
-      toggleTheme: () => set((state) => {
-        const newTheme = state.theme === 'light' ? 'dark' : 'light';
-        return { theme: newTheme };
-      }),
+      toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
       
       leads: [],
-      addLead: (lead) => set((state) => ({ 
-        leads: [{ id: crypto.randomUUID(), date: getTodayDate(), ...lead }, ...state.leads] 
-      })),
-      moveLead: (id, status) => set((state) => ({ 
-        leads: state.leads.map(l => l.id === id ? { ...l, status } : l) 
-      })),
-      deleteLead: (id) => set((state) => ({ 
-        leads: state.leads.filter(l => l.id !== id) 
-      })),
+      addLead: (lead) => set((state) => ({ leads: [{ id: crypto.randomUUID(), date: getTodayDate(), ...lead }, ...state.leads] })),
+      moveLead: (id, status) => set((state) => ({ leads: state.leads.map(l => l.id === id ? { ...l, status } : l) })),
+      deleteLead: (id) => set((state) => ({ leads: state.leads.filter(l => l.id !== id) })),
 
       protocolos: [],
-      addProtocolo: (prot) => set((state) => ({ 
-        // Aqui mantemos o seu prefixo 'REQ-', mas garantimos que não vai repetir
-        protocolos: [{ id: `REQ-${crypto.randomUUID().split('-')[0].toUpperCase()}`, date: getTodayDate(), status: 'analise', ...prot }, ...state.protocolos] 
-      })),
-      updateProtocoloStatus: (id, status) => set((state) => ({ 
-        protocolos: state.protocolos.map(p => p.id === id ? { ...p, status } : p) 
-      })),
-      deleteProtocolo: (id) => set((state) => ({ 
-        protocolos: state.protocolos.filter(p => p.id !== id) 
-      })),
+      addProtocolo: (prot) => set((state) => ({ protocolos: [{ id: generateShortId('REQ'), date: getTodayDate(), status: 'analise', ...prot }, ...state.protocolos] })),
+      updateProtocoloStatus: (id, status) => set((state) => ({ protocolos: state.protocolos.map(p => p.id === id ? { ...p, status } : p) })),
+      deleteProtocolo: (id) => set((state) => ({ protocolos: state.protocolos.filter(p => p.id !== id) })),
 
       alunos: [],
-      addAluno: (aluno) => set((state) => ({ 
-        alunos: [{ id: `ALU-${crypto.randomUUID().split('-')[0].toUpperCase()}`, date: getTodayDate(), status: 'pendente', ...aluno }, ...state.alunos] 
-      })),
-      moveAluno: (id, status) => set((state) => ({ 
-        alunos: state.alunos.map(a => a.id === id ? { ...a, status } : a) 
-      })),
-      deleteAluno: (id) => set((state) => ({ 
-        alunos: state.alunos.filter(a => a.id !== id) 
-      })),
+      addAluno: (aluno) => set((state) => ({ alunos: [{ id: generateShortId('ALU'), date: getTodayDate(), status: 'pendente', ...aluno }, ...state.alunos] })),
+      moveAluno: (id, status) => set((state) => ({ alunos: state.alunos.map(a => a.id === id ? { ...a, status } : a) })),
+      deleteAluno: (id) => set((state) => ({ alunos: state.alunos.filter(a => a.id !== id) })),
 
       scripts: [],
-      addScript: (script) => set((state) => ({ 
-        scripts: [{ id: crypto.randomUUID(), ...script }, ...state.scripts] 
-      })),
-      deleteScript: (id) => set((state) => ({ 
-        scripts: state.scripts.filter(s => s.id !== id) 
-      })),
+      addScript: (script) => set((state) => ({ scripts: [{ id: crypto.randomUUID(), ...script }, ...state.scripts] })),
+      deleteScript: (id) => set((state) => ({ scripts: state.scripts.filter(s => s.id !== id) })),
     }),
     { name: 'iefe-storage' }
   )
